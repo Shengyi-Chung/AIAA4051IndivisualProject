@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+outputs/
+data_splits/
+model/
+wandb/
+wandb/run-*/
+wandb/latest-run
+wandb/debug.log
+wandbAPIKey.txt
