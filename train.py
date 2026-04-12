@@ -5,6 +5,7 @@ import os
 import torch
 from transformers import (
     DataCollatorForLanguageModeling,
+    EarlyStoppingCallback,
     Trainer,
     TrainingArguments,
 )
@@ -41,12 +42,12 @@ def save_split(train_data: list, val_data: list, output_dir: str):
 
 def parse_args():
     parser = argparse.ArgumentParser(description="LoRA fine-tuning for QA dataset")
-    parser.add_argument("--model_name", type=str, required=True)
+    parser.add_argument("--model_name", type=str, default="meta-llama/Llama-2-7b-hf")
     parser.add_argument("--model_dir", type=str, default="model")
     parser.add_argument("--allow_cpu", action="store_true", default=False)
     parser.add_argument("--dataset_path", type=str, default="dataset.json")
-    parser.add_argument("--output_dir", type=str, default="StudentID_Name_model")
-    parser.add_argument("--report_dir", type=str, default="outputs")
+    parser.add_argument("--output_dir", type=str, default="StudentID_Name_model_lr1e4_e2_d01")
+    parser.add_argument("--report_dir", type=str, default="outputs_lr1e4_e2_d01")
     parser.add_argument("--split_dir", type=str, default="data_splits")
 
     parser.add_argument("--val_ratio", type=float, default=0.1)
@@ -55,14 +56,14 @@ def parse_args():
 
     parser.add_argument("--rank", type=int, default=16)
     parser.add_argument("--alpha", type=int, default=32)
-    parser.add_argument("--dropout", type=float, default=0.05)
-    parser.add_argument("--epochs", type=int, default=3)
-    parser.add_argument("--learning_rate", type=float, default=2e-4)
+    parser.add_argument("--dropout", type=float, default=0.1)
+    parser.add_argument("--epochs", type=int, default=2)
+    parser.add_argument("--learning_rate", type=float, default=1e-4)
     parser.add_argument("--batch_size", type=int, default=2)
     parser.add_argument("--grad_accum", type=int, default=8)
-    parser.add_argument("--use_wandb", action="store_true", default=False)
+    parser.add_argument("--use_wandb", type=lambda x: x.lower() in ('true', '1', 'yes'), default=True, nargs='?', const=True, metavar='BOOL')
     parser.add_argument("--wandb_project", type=str, default="AIAA4051-Llama2-LoRA")
-    parser.add_argument("--wandb_run_name", type=str, default="")
+    parser.add_argument("--wandb_run_name", type=str, default="exp-lr1e4-r16-e2-d01")
     parser.add_argument("--wandb_mode", type=str, default="online", choices=["online", "offline", "disabled"])
 
     parser.add_argument(
@@ -128,6 +129,10 @@ def main():
         logging_steps=10,
         eval_strategy="epoch",
         save_strategy="epoch",
+        load_best_model_at_end=True,
+        metric_for_best_model="eval_loss",
+        greater_is_better=False,
+        save_total_limit=1,
         fp16=use_cuda and not use_bf16,
         bf16=use_bf16,
         report_to="wandb" if use_wandb else "none",
@@ -142,6 +147,7 @@ def main():
         train_dataset=train_ds,
         eval_dataset=val_ds,
         data_collator=data_collator,
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=1)],
     )
 
     print("Starting training...")

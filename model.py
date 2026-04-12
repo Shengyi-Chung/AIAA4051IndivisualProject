@@ -1,8 +1,6 @@
 import json
 import os
 import random
-import subprocess
-import sys
 from dataclasses import dataclass
 from typing import List
 
@@ -10,6 +8,7 @@ import torch
 from torch.utils.data import Dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import LoraConfig, TaskType, get_peft_model
+from modelscope.hub.snapshot_download import snapshot_download
 
 
 SYSTEM_PROMPT = "Answer the question with a short and precise phrase."
@@ -90,19 +89,10 @@ def ensure_model_downloaded(model_name: str, local_dir: str = DEFAULT_MODEL_DIR)
     os.makedirs(local_dir, exist_ok=True)
     print(f"Local model not found. Downloading {model_name} to {local_dir}...")
 
-    command = [
-        sys.executable,
-        "-m",
-        "modelscope",
-        "download",
-        "--model",
-        model_name,
-        "--local_dir",
-        local_dir,
-    ]
-    result = subprocess.run(command, check=False)
-    if result.returncode != 0:
-        raise RuntimeError(f"Model download failed for {model_name}.")
+    try:
+        snapshot_download(model_id=model_name, local_dir=local_dir)
+    except Exception as e:
+        raise RuntimeError(f"Model download failed for {model_name}: {e}") from e
 
     if not _has_model_artifacts(local_dir):
         raise RuntimeError(f"Model download completed but no artifacts were found in {local_dir}.")
