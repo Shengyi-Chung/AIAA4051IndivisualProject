@@ -9,7 +9,7 @@ param(
 python .\train.py `
   --model_name $ModelName `
   --dataset_path .\dataset.json `
-  --output_dir .\StudentID_Name_model `
+  --output_dir .\model_r${Rank}_a${Alpha}_d$($Dropout.ToString().Replace('.', 'p'))_e${Epochs} `
   --report_dir .\outputs `
   --split_dir .\data_splits `
   --epochs $Epochs `

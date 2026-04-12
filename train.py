@@ -46,7 +46,7 @@ def parse_args():
     parser.add_argument("--model_dir", type=str, default="model")
     parser.add_argument("--allow_cpu", action="store_true", default=False)
     parser.add_argument("--dataset_path", type=str, default="dataset.json")
-    parser.add_argument("--output_dir", type=str, default="StudentID_Name_model_lr1e4_e2_d01")
+    parser.add_argument("--output_dir", type=str, default="model_lr1e4_e2_d01")
     parser.add_argument("--report_dir", type=str, default="outputs_lr1e4_e2_d01")
     parser.add_argument("--split_dir", type=str, default="data_splits")
 
