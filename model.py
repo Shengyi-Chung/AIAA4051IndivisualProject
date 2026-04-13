@@ -141,6 +141,9 @@ class QADataset(Dataset):
         )
 
         features = {k: v.squeeze(0) for k, v in item.items()}
+        if not self.mask_question:
+            return features
+
         labels = features["input_ids"].clone()
 
         if self.mask_question:

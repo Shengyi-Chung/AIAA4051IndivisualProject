@@ -6,6 +6,7 @@ os.environ["TRANSFORMERS_NO_TF"] = "1"
 
 import torch
 from transformers import (
+    DataCollatorForLanguageModeling,
     EarlyStoppingCallback,
     Trainer,
     TrainingArguments,
@@ -24,7 +25,7 @@ from eval import run_accuracy_eval
 
 
 # Single place to edit experiment defaults.
-EXPERIMENT_TAG = "lr1e4-r16-e2-d01-bs4-ga4_maskq-true-padleft"  
+EXPERIMENT_TAG = "lr1e4-r16-e2-d01-bs4-ga4_maskq-false-padright"  
 DEFAULTS = {
     "model_name": "meta-llama/Llama-2-7b-hf",
     "model_dir": "model",
@@ -42,8 +43,8 @@ DEFAULTS = {
     "learning_rate": 1e-4,
     "batch_size": 4,
     "grad_accum": 4,
-    "mask_question": True,
-    "padding_side": "left",
+    "mask_question": False,
+    "padding_side": "right",
     "use_wandb": True,
     "wandb_project": "AIAA4051-Llama2-LoRA",
     "wandb_run_name": f"exp-{EXPERIMENT_TAG}",
@@ -177,30 +178,33 @@ def main():
         report_to="wandb" if use_wandb else "none",
     )
 
-    def data_collator(features):
-        labels = [f["labels"] for f in features]
-        inputs = [
-            {k: v for k, v in f.items() if k != "labels"}
-            for f in features
-        ]
-        batch = tokenizer.pad(inputs, padding=True, return_tensors="pt")
+    if args.mask_question:
+        def data_collator(features):
+            labels = [f["labels"] for f in features]
+            inputs = [
+                {k: v for k, v in f.items() if k != "labels"}
+                for f in features
+            ]
+            batch = tokenizer.pad(inputs, padding=True, return_tensors="pt")
 
-        max_len = batch["input_ids"].size(1)
-        padded_labels = []
-        for label in labels:
-            pad_len = max_len - label.size(0)
-            if pad_len < 0:
-                padded = label[:max_len]
-            else:
-                pad_tensor = torch.full((pad_len,), -100, dtype=label.dtype)
-                if tokenizer.padding_side == "left":
-                    padded = torch.cat([pad_tensor, label], dim=0)
+            max_len = batch["input_ids"].size(1)
+            padded_labels = []
+            for label in labels:
+                pad_len = max_len - label.size(0)
+                if pad_len < 0:
+                    padded = label[:max_len]
                 else:
-                    padded = torch.cat([label, pad_tensor], dim=0)
-            padded_labels.append(padded)
+                    pad_tensor = torch.full((pad_len,), -100, dtype=label.dtype)
+                    if tokenizer.padding_side == "left":
+                        padded = torch.cat([pad_tensor, label], dim=0)
+                    else:
+                        padded = torch.cat([label, pad_tensor], dim=0)
+                padded_labels.append(padded)
 
-        batch["labels"] = torch.stack(padded_labels)
-        return batch
+            batch["labels"] = torch.stack(padded_labels)
+            return batch
+    else:
+        data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
 
     # Train
     trainer = Trainer(
