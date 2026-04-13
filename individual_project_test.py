@@ -1,3 +1,17 @@
+import os
+import sys
+
+cuda13_lib = "/environment/miniconda3/lib/python3.11/site-packages/nvidia/cu13/lib"
+
+if os.environ.get("_CUDA13_BOOTSTRAPPED") != "1":
+    current_ld_library_path = os.environ.get("LD_LIBRARY_PATH", "")
+    os.environ["LD_LIBRARY_PATH"] = f"{cuda13_lib}:{current_ld_library_path}" if current_ld_library_path else cuda13_lib
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    os.environ["_CUDA13_BOOTSTRAPPED"] = "1"
+    os.execvpe(sys.executable, [sys.executable] + sys.argv, os.environ)
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
 import torch
 import json
 import csv
@@ -5,14 +19,14 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from peft import PeftModel
 from tqdm import tqdm
 
-import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-
 # ========== 路径配置 ==========
-base_model_path = "XXXX"
-adapter_path = "XXXX"
-test_data_path = "XXXX"
+base_model_path = "./model"
+adapter_path = "./model_lr5e5-r16-e2-d01-bs4-ga4"
+test_data_path = "./data_splits/val_split.json"
 
+print("=" * 60)
+print(f"Adapter Path: {adapter_path}")
+print("=" * 60)
 
 # ========== 加载模型 ==========
 quantization_config = BitsAndBytesConfig(
@@ -83,3 +97,4 @@ for example in tqdm(test_data):
 
 accuracy = 100 * correct / len(test_data)
 print(f"\nAccuracy: {accuracy:.2f}% ({correct}/{len(test_data)})")
+

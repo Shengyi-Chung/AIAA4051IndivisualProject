@@ -2,6 +2,8 @@ import argparse
 import json
 import os
 
+os.environ["TRANSFORMERS_NO_TF"] = "1"
+
 import torch
 from transformers import (
     DataCollatorForLanguageModeling,
@@ -20,6 +22,33 @@ from model import (
     ensure_gpu_ready,
 )
 from eval import run_accuracy_eval
+
+
+# Single place to edit experiment defaults.
+EXPERIMENT_TAG = "lr5e5-r16-e2-d01-bs4-ga4"
+DEFAULTS = {
+    "model_name": "meta-llama/Llama-2-7b-hf",
+    "model_dir": "model",
+    "dataset_path": "dataset.json",
+    "output_dir": f"model_{EXPERIMENT_TAG}",
+    "report_dir": f"outputs_{EXPERIMENT_TAG}",
+    "split_dir": "data_splits",
+    "val_ratio": 0.1,
+    "seed": 42,
+    "max_length": 256,
+    "rank": 16,
+    "alpha": 32,
+    "dropout": 0.1,
+    "epochs": 2,
+    "learning_rate": 5e-5,
+    "batch_size": 4,
+    "grad_accum": 4,
+    "use_wandb": True,
+    "wandb_project": "AIAA4051-Llama2-LoRA",
+    "wandb_run_name": f"exp-{EXPERIMENT_TAG}",
+    "wandb_mode": "online",
+    "target_modules": "q_proj,k_proj,v_proj,o_proj",
+}
 
 
 def save_split(train_data: list, val_data: list, output_dir: str):
@@ -42,34 +71,34 @@ def save_split(train_data: list, val_data: list, output_dir: str):
 
 def parse_args():
     parser = argparse.ArgumentParser(description="LoRA fine-tuning for QA dataset")
-    parser.add_argument("--model_name", type=str, default="meta-llama/Llama-2-7b-hf")
-    parser.add_argument("--model_dir", type=str, default="model")
+    parser.add_argument("--model_name", type=str, default=DEFAULTS["model_name"])
+    parser.add_argument("--model_dir", type=str, default=DEFAULTS["model_dir"])
     parser.add_argument("--allow_cpu", action="store_true", default=False)
-    parser.add_argument("--dataset_path", type=str, default="dataset.json")
-    parser.add_argument("--output_dir", type=str, default="model_lr1e4_e2_d01")
-    parser.add_argument("--report_dir", type=str, default="outputs_lr1e4_e2_d01")
-    parser.add_argument("--split_dir", type=str, default="data_splits")
+    parser.add_argument("--dataset_path", type=str, default=DEFAULTS["dataset_path"])
+    parser.add_argument("--output_dir", type=str, default=DEFAULTS["output_dir"])
+    parser.add_argument("--report_dir", type=str, default=DEFAULTS["report_dir"])
+    parser.add_argument("--split_dir", type=str, default=DEFAULTS["split_dir"])
 
-    parser.add_argument("--val_ratio", type=float, default=0.1)
-    parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--max_length", type=int, default=256)
+    parser.add_argument("--val_ratio", type=float, default=DEFAULTS["val_ratio"])
+    parser.add_argument("--seed", type=int, default=DEFAULTS["seed"])
+    parser.add_argument("--max_length", type=int, default=DEFAULTS["max_length"])
 
-    parser.add_argument("--rank", type=int, default=16)
-    parser.add_argument("--alpha", type=int, default=32)
-    parser.add_argument("--dropout", type=float, default=0.1)
-    parser.add_argument("--epochs", type=int, default=2)
-    parser.add_argument("--learning_rate", type=float, default=1e-4)
-    parser.add_argument("--batch_size", type=int, default=2)
-    parser.add_argument("--grad_accum", type=int, default=8)
-    parser.add_argument("--use_wandb", type=lambda x: x.lower() in ('true', '1', 'yes'), default=True, nargs='?', const=True, metavar='BOOL')
-    parser.add_argument("--wandb_project", type=str, default="AIAA4051-Llama2-LoRA")
-    parser.add_argument("--wandb_run_name", type=str, default="exp-lr1e4-r16-e2-d01")
-    parser.add_argument("--wandb_mode", type=str, default="online", choices=["online", "offline", "disabled"])
+    parser.add_argument("--rank", type=int, default=DEFAULTS["rank"])
+    parser.add_argument("--alpha", type=int, default=DEFAULTS["alpha"])
+    parser.add_argument("--dropout", type=float, default=DEFAULTS["dropout"])
+    parser.add_argument("--epochs", type=int, default=DEFAULTS["epochs"])
+    parser.add_argument("--learning_rate", type=float, default=DEFAULTS["learning_rate"])
+    parser.add_argument("--batch_size", type=int, default=DEFAULTS["batch_size"])
+    parser.add_argument("--grad_accum", type=int, default=DEFAULTS["grad_accum"])
+    parser.add_argument("--use_wandb", type=lambda x: x.lower() in ('true', '1', 'yes'), default=DEFAULTS["use_wandb"], nargs='?', const=True, metavar='BOOL')
+    parser.add_argument("--wandb_project", type=str, default=DEFAULTS["wandb_project"])
+    parser.add_argument("--wandb_run_name", type=str, default=DEFAULTS["wandb_run_name"])
+    parser.add_argument("--wandb_mode", type=str, default=DEFAULTS["wandb_mode"], choices=["online", "offline", "disabled"])
 
     parser.add_argument(
         "--target_modules",
         type=str,
-        default="q_proj,k_proj,v_proj,o_proj",
+        default=DEFAULTS["target_modules"],
         help="Comma-separated list of LoRA target modules",
     )
     return parser.parse_args()
@@ -82,10 +111,16 @@ def main():
     use_wandb = args.use_wandb and args.wandb_mode != "disabled"
 
     if use_wandb:
-        os.environ["WANDB_PROJECT"] = args.wandb_project
-        os.environ["WANDB_MODE"] = args.wandb_mode
-        if run_name:
-            os.environ["WANDB_NAME"] = run_name
+        try:
+            import wandb  # noqa: F401
+
+            os.environ["WANDB_PROJECT"] = args.wandb_project
+            os.environ["WANDB_MODE"] = args.wandb_mode
+            if run_name:
+                os.environ["WANDB_NAME"] = run_name
+        except Exception as e:
+            print(f"Warning: W&B unavailable, disabling W&B logging: {e}")
+            use_wandb = False
 
     ensure_gpu_ready(require_gpu=require_gpu)
 
