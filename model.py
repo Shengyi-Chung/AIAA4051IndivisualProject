@@ -120,30 +120,49 @@ def ensure_gpu_ready(require_gpu: bool = True) -> None:
 class QADataset(Dataset):
     """Torch dataset for QA pairs."""
 
-    def __init__(self, examples: List[QAExample], tokenizer, max_length: int):
+    def __init__(self, examples: List[QAExample], tokenizer, max_length: int, mask_question: bool = False):
         self.examples = examples
         self.tokenizer = tokenizer
         self.max_length = max_length
+        self.mask_question = mask_question
 
     def __len__(self):
         return len(self.examples)
 
     def __getitem__(self, idx):
         ex = self.examples[idx]
-        text = f"{build_prompt(ex.question)} {ex.answer}{self.tokenizer.eos_token}"
+        prompt = build_prompt(ex.question)
+        text = f"{prompt} {ex.answer}{self.tokenizer.eos_token}"
         item = self.tokenizer(
             text,
             truncation=True,
             max_length=self.max_length,
             return_tensors="pt",
         )
-        return {k: v.squeeze(0) for k, v in item.items()}
+
+        features = {k: v.squeeze(0) for k, v in item.items()}
+        labels = features["input_ids"].clone()
+
+        if self.mask_question:
+            prompt_item = self.tokenizer(
+                prompt,
+                truncation=True,
+                max_length=self.max_length,
+                add_special_tokens=False,
+                return_tensors="pt",
+            )
+            prompt_len = min(prompt_item["input_ids"].size(1), labels.size(0))
+            labels[:prompt_len] = -100
+
+        features["labels"] = labels
+        return features
 
 
 def load_model_and_tokenizer(
     model_name: str,
     local_dir: str = DEFAULT_MODEL_DIR,
     require_gpu: bool = True,
+    padding_side: str = "right",
 ):
     """Load base model and tokenizer from a local directory or remote model name."""
     ensure_gpu_ready(require_gpu=require_gpu)
@@ -152,6 +171,9 @@ def load_model_and_tokenizer(
     tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
+    if padding_side not in ("left", "right"):
+        raise ValueError(f"Unsupported padding_side: {padding_side}")
+    tokenizer.padding_side = padding_side
 
     use_cuda = torch.cuda.is_available()
     dtype = torch.bfloat16 if (use_cuda and torch.cuda.is_bf16_supported()) else (torch.float16 if use_cuda else torch.float32)
