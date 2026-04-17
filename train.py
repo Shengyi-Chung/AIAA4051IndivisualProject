@@ -9,6 +9,7 @@ from transformers import (
     DataCollatorForLanguageModeling,
     EarlyStoppingCallback,
     Trainer,
+    TrainerCallback,
     TrainingArguments,
 )
 
@@ -25,7 +26,7 @@ from eval import run_accuracy_eval
 
 
 # Single place to edit experiment defaults.
-EXPERIMENT_TAG = "lr1e4-r16-e2-d01-bs4-ga4_maskq-false-padright"  
+EXPERIMENT_TAG = "lr1e4-r48-e2-d01-bs4-ga4_maskq-false-padright"
 DEFAULTS = {
     "model_name": "meta-llama/Llama-2-7b-hf",
     "model_dir": "model",
@@ -36,8 +37,8 @@ DEFAULTS = {
     "val_ratio": 0.1,
     "seed": 42,
     "max_length": 256,
-    "rank": 16,
-    "alpha": 32,
+    "rank": 48,
+    "alpha": 96,
     "dropout": 0.1,
     "epochs": 2,
     "learning_rate": 1e-4,
@@ -206,6 +207,39 @@ def main():
     else:
         data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
 
+    class EpochAccuracyCallback(TrainerCallback):
+        """Run generation-based accuracy eval at the end of each epoch."""
+
+        def __init__(self, tokenizer, val_data, report_dir: str, use_wandb: bool):
+            self.tokenizer = tokenizer
+            self.val_data = val_data
+            self.report_dir = report_dir
+            self.use_wandb = use_wandb
+            self.history = []
+
+        def on_epoch_end(self, args, state, control, model=None, **kwargs):
+            if model is None:
+                return control
+
+            accuracy, _ = run_accuracy_eval(model, self.tokenizer, self.val_data)
+            epoch_value = float(state.epoch) if state.epoch is not None else -1.0
+            print(f"[Epoch {epoch_value:.1f}] accuracy={accuracy:.4f}")
+
+            self.history.append({"epoch": epoch_value, "accuracy": accuracy})
+            history_path = os.path.join(self.report_dir, "epoch_accuracy.json")
+            with open(history_path, "w", encoding="utf-8") as f:
+                json.dump(self.history, f, indent=2, ensure_ascii=False)
+
+            if self.use_wandb:
+                try:
+                    import wandb
+
+                    wandb.log({"eval/accuracy_epoch": accuracy, "epoch": epoch_value})
+                except Exception as e:
+                    print(f"Warning: W&B epoch accuracy logging failed: {e}")
+
+            return control
+
     # Train
     trainer = Trainer(
         model=model,
@@ -213,7 +247,10 @@ def main():
         train_dataset=train_ds,
         eval_dataset=val_ds,
         data_collator=data_collator,
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=1)],
+        callbacks=[
+            EarlyStoppingCallback(early_stopping_patience=3),
+            EpochAccuracyCallback(tokenizer, val_data, args.report_dir, use_wandb),
+        ],
     )
 
     print("Starting training...")

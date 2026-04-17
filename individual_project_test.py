@@ -21,7 +21,7 @@ from tqdm import tqdm
 
 # ========== 路径配置 ==========
 base_model_path = "./model"
-adapter_path = "./model_lr5e5-r16-e2-d01-bs4-ga4"
+adapter_path = os.environ.get("ADAPTER_PATH", "./outputs_cmp-padright-qkvo/checkpoint-564")
 test_data_path = "./data_splits/val_split.json"
 
 print("=" * 60)
