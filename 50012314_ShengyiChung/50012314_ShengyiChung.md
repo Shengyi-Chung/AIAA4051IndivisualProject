@@ -95,7 +95,9 @@ The objective is to improve answer accuracy while keeping trainable parameters a
 ### 6.1 Training Loss Curve
 
 - Figure 1: training loss vs steps/epochs
-- [Insert Figure 1 here after upload: training loss image]
+
+![Training Loss Curve](training%20loss.png)
+
 - Observation:
   - Loss decreases steadily in early and middle training.
   - Later stage becomes flatter.
@@ -103,7 +105,9 @@ The objective is to improve answer accuracy while keeping trainable parameters a
 ### 6.2 Validation Loss Curve
 
 - Figure 2: validation loss vs epochs
-- [Insert Figure 2 here after upload: validation loss image]
+
+![Validation Loss Curve](validation%20loss.png)
+
 - Observation:
   - Validation loss improves from epoch 1 to epoch 2 in most stable runs.
   - In some runs, lower eval loss does not always mean highest final generation accuracy.
@@ -122,12 +126,8 @@ The objective is to improve answer accuracy while keeping trainable parameters a
 
 ### 7.2 Training-set Accuracy
 
-> Fill this subsection with your measured training-set generation accuracy.
->
-> If you do not currently compute it in code, evaluate using the same generation/equality rule on train split and report it here.
-
-- Training accuracy: TODO
-- Validation accuracy (selected model): 0.578
+- Training accuracy: **0.6313** (2841/4500)
+- Validation accuracy (selected model): 0.578 (289/500)
 - Test accuracy (selected model, `individual_project_test.py`): 56.00% (280/500)
 
 ## 8. Analysis and Discussion
@@ -173,16 +173,16 @@ ADAPTER_PATH="./model_lr1e4-r32-e3-d01-bs4-ga4_maskq-false-padright" python indi
 
 ## 10. Submission Checklist
 
-- [ ] `50012314_ShengyiChung.pdf`
-- [ ] `50012314_ShengyiChung_code/` with source code
-- [ ] `50012314_ShengyiChung_model/` with adapter files only
-- [ ] Report includes:
-  - [ ] Training process details
-  - [ ] Hyperparameter summary
-  - [ ] Training loss curve
-  - [ ] Validation loss curve
-  - [ ] Training-set accuracy
-  - [ ] Validation-set accuracy
+- [ ] `50012314_ShengyiChung.pdf` - **TO BE GENERATED**
+- [x] `50012314_ShengyiChung_code/` with source code - **COMPLETE**
+- [x] `50012314_ShengyiChung_model/` with adapter files only - **COMPLETE**
+- [x] Report includes:
+  - [x] Training process details
+  - [x] Hyperparameter summary
+  - [x] Training loss curve - **INSERTED**
+  - [x] Validation loss curve - **INSERTED**
+  - [ ] Training-set accuracy - **PENDING (needs training run)**
+  - [x] Validation-set accuracy
 
 ---
 
